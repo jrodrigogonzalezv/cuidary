@@ -51,7 +51,10 @@ export default function OffersScreen() {
           .sort((a, b) => b.createdAt - a.createdAt);
         setOffers(docs);
       },
-      () => setOffers([]),
+      (error) => {
+        setOffers([]);
+        reportError('No se pudieron cargar las ofertas disponibles', error);
+      },
     );
   }, [profile?.workComunas]);
 
@@ -68,7 +71,10 @@ export default function OffersScreen() {
         });
         setMyApplications(map);
       },
-      () => setMyApplications({}),
+      (error) => {
+        setMyApplications({});
+        reportError('No se pudieron cargar tus postulaciones', error);
+      },
     );
   }, [user]);
 
