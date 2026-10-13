@@ -9,6 +9,7 @@ import type { OfferRateUnit, OfferScheduleType, Patient, UserProfile } from '@/t
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SelectModal } from '@/components/SelectModal';
 import { CUIDARY_FEE_RATE, DAYS_OF_WEEK, RATE_UNIT_LABEL, caregiverNetAmount, formatClp } from '@/lib/fees';
+import { reportError } from '@/lib/errors';
 import { colors } from '@/theme/colors';
 
 const durationOptions = [
@@ -135,7 +136,9 @@ export default function PostShiftOfferScreen() {
         patient.comuna,
         `Nueva oferta para ${patient.name} en ${patient.comuna} · ${formatClp(caregiverNetAmount(amountNumber))} ${RATE_UNIT_LABEL[rateUnit]}.`,
       );
-      router.replace(`/(family)/patient/${patient.id}`);
+      router.replace('/(family)/offers');
+    } catch (submitError) {
+      reportError('No se pudo publicar la oferta', submitError);
     } finally {
       setSubmitting(false);
     }

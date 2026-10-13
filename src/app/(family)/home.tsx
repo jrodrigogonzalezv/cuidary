@@ -23,6 +23,7 @@ import { StatTile } from '@/components/StatTile';
 import { FadeInUp } from '@/components/FadeInUp';
 import { Pulse } from '@/components/Pulse';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { NotificationBell } from '@/components/NotificationBell';
 import { isValidAge, isValidName } from '@/lib/validators';
 
 const dependencyLabel: Record<DependencyLevel, string> = {
@@ -101,7 +102,12 @@ export default function FamilyHome() {
     <View style={styles.container}>
       <ScreenHeader title="Bitácora" />
       <ScrollView contentContainerStyle={styles.content}>
-      <DashboardHeader name={profile?.name ?? 'Familia'} subtitle="Bienestar de tu familiar" photoUrl={profile?.photoUrl} />
+      <DashboardHeader
+        name={profile?.name ?? 'Familia'}
+        subtitle="Bienestar de tu familiar"
+        photoUrl={profile?.photoUrl}
+        right={<NotificationBell href="/(family)/notifications" />}
+      />
 
       <FadeInUp>
         <View style={styles.statsRow}>

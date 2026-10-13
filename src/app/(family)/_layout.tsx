@@ -69,6 +69,27 @@ export default function FamilyLayout() {
         }}
       />
       <Tabs.Screen
+        name="offers"
+        options={{
+          title: 'Ofertas',
+          tabBarIcon: ({ color }) => <FontAwesome size={22} name="briefcase" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="offer-applicants/[offerId]"
+        options={{
+          href: null,
+          title: 'Postulantes',
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null,
+          title: 'Notificaciones',
+        }}
+      />
+      <Tabs.Screen
         name="verify"
         options={{
           href: null,

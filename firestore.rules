@@ -120,17 +120,35 @@ service cloud.firestore {
         && request.auth.uid in patient(request.resource.data.patientId).familyUids
         && request.resource.data.status == 'abierta';
 
-      // Family can edit or close their own offer while it's still open.
+      // Family can edit or close their own offer while it's still open, and this is also
+      // how they choose a caregiver from the applicants (status -> 'asignada' +
+      // assignedCaregiverUid/Name). Caregivers never flip this themselves — they only
+      // apply, via the `applications` subcollection below.
       allow update: if isSignedIn()
         && request.auth.uid in resource.data.familyUids
         && resource.data.status == 'abierta';
 
-      // Any caregiver can accept an open offer, claiming it for themselves.
-      allow update: if isSignedIn()
-        && resource.data.status == 'abierta'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'assignedCaregiverUid', 'assignedCaregiverName'])
-        && request.resource.data.status == 'asignada'
-        && request.resource.data.assignedCaregiverUid == request.auth.uid;
+      // A caregiver applies to an open offer; the family reviews applications and
+      // picks one (see the `shiftOffers` update rule above for how the offer itself
+      // gets closed once chosen).
+      match /applications/{caregiverUid} {
+        allow read: if isSignedIn()
+          && (request.auth.uid in offer(offerId).familyUids || request.auth.uid == caregiverUid);
+
+        allow create: if isSignedIn()
+          && request.auth.uid == caregiverUid
+          && request.resource.data.caregiverUid == request.auth.uid
+          && offer(offerId).status == 'abierta'
+          && request.resource.data.status == 'pendiente';
+
+        // The family marks applicants as chosen/rejected; nothing else changes.
+        allow update: if isSignedIn()
+          && request.auth.uid in offer(offerId).familyUids
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+
+        // A caregiver can withdraw their own still-pending application.
+        allow delete: if isSignedIn() && request.auth.uid == caregiverUid && resource.data.status == 'pendiente';
+      }
     }
 
     match /ratings/{shiftId} {

@@ -4,8 +4,10 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { doc, getDoc, runTransaction } from '@react-native-firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
-import type { Shift, UserProfile } from '@/types/models';
+import type { RatingTag, Shift, UserProfile } from '@/types/models';
 import { StarRatingInput } from '@/components/StarRating';
+import { RATING_TAGS, RATING_TAG_LABEL } from '@/lib/ratingTags';
+import { reportError } from '@/lib/errors';
 import { colors } from '@/theme/colors';
 
 export function RatingPrompt({ shift, patientName }: { shift: Shift; patientName: string }) {
@@ -13,9 +15,14 @@ export function RatingPrompt({ shift, patientName }: { shift: Shift; patientName
   const [checked, setChecked] = useState(false);
   const [alreadyRated, setAlreadyRated] = useState(true);
   const [stars, setStars] = useState(0);
+  const [tags, setTags] = useState<RatingTag[]>([]);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+
+  function toggleTag(tag: RatingTag) {
+    setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  }
 
   useEffect(() => {
     getDoc(doc(db, 'ratings', shift.id)).then((snapshot) => {
@@ -43,12 +50,15 @@ export function RatingPrompt({ shift, patientName }: { shift: Shift; patientName
           familyUid: user.uid,
           patientName,
           stars,
+          tags,
           comment: comment.trim() || null,
           createdAt: Date.now(),
         });
         tx.update(caregiverRef, { ratingAvg: nextAvg, ratingCount: nextCount });
       });
       setDone(true);
+    } catch (error) {
+      reportError('No se pudo enviar tu evaluación', error);
     } finally {
       setSubmitting(false);
     }
@@ -72,6 +82,14 @@ export function RatingPrompt({ shift, patientName }: { shift: Shift; patientName
       <View style={styles.starsRow}>
         <StarRatingInput value={stars} onChange={setStars} />
       </View>
+      <Text style={styles.tagsLabel}>¿Qué destacarías? (opcional)</Text>
+      <View style={styles.tagsRow}>
+        {RATING_TAGS.map((tag) => (
+          <Pressable key={tag} style={[styles.tagChip, tags.includes(tag) && styles.tagChipActive]} onPress={() => toggleTag(tag)}>
+            <Text style={[styles.tagChipText, tags.includes(tag) && styles.tagChipTextActive]}>{RATING_TAG_LABEL[tag]}</Text>
+          </Pressable>
+        ))}
+      </View>
       <TextInput
         style={styles.input}
         placeholder="Deja un comentario (opcional)"
@@ -92,6 +110,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '800', color: colors.ink },
   subtitle: { color: colors.muted, fontSize: 13, lineHeight: 18 },
   starsRow: { alignItems: 'center', paddingVertical: 6 },
+  tagsLabel: { color: colors.muted, fontSize: 12, fontWeight: '600', marginTop: 4 },
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tagChip: { borderWidth: 1, borderColor: colors.border, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7 },
+  tagChipActive: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
+  tagChipText: { color: colors.muted, fontSize: 12.5, fontWeight: '600' },
+  tagChipTextActive: { color: colors.primary },
   input: {
     borderWidth: 1,
     borderColor: colors.border,

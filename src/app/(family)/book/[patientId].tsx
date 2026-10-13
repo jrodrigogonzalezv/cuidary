@@ -9,6 +9,7 @@ import type { Patient, UserProfile } from '@/types/models';
 import { Avatar } from '@/components/Avatar';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { StarRatingDisplay } from '@/components/StarRating';
+import { reportError } from '@/lib/errors';
 import { colors } from '@/theme/colors';
 
 const durationOptions = [
@@ -87,6 +88,8 @@ export default function BookCaregiverScreen() {
         type: 'shift_assigned',
       });
       router.replace(`/(family)/patient/${patient.id}`);
+    } catch (error) {
+      reportError('No se pudo reservar el turno', error);
     } finally {
       setSubmitting(false);
     }
