@@ -128,27 +128,39 @@ service cloud.firestore {
         && request.auth.uid in resource.data.familyUids
         && resource.data.status == 'abierta';
 
-      // A caregiver applies to an open offer; the family reviews applications and
-      // picks one (see the `shiftOffers` update rule above for how the offer itself
-      // gets closed once chosen).
-      match /applications/{caregiverUid} {
-        allow read: if isSignedIn()
-          && (request.auth.uid in offer(offerId).familyUids || request.auth.uid == caregiverUid);
+    }
 
-        allow create: if isSignedIn()
-          && request.auth.uid == caregiverUid
-          && request.resource.data.caregiverUid == request.auth.uid
-          && offer(offerId).status == 'abierta'
-          && request.resource.data.status == 'pendiente';
+    // A caregiver applies to an open offer; the family reviews applications and picks
+    // one (see the `shiftOffers` update rule above for how the offer itself gets closed
+    // once chosen). This has to be a TOP-LEVEL match using a `{path=**}` wildcard rather
+    // than nested inside `shiftOffers/{offerId}` — Firestore only secures a collection-group
+    // query (the caregiver's "mis postulaciones" screen uses one) against rules declared
+    // this way; a rule nested under a specific named parent is not applied to
+    // collectionGroup() reads, even though it works fine for every other read/write here.
+    // `path` captures everything before `applications`, i.e. `['shiftOffers', offerId]`.
+    match /{path=**}/applications/{caregiverUid} {
+      // The first branch checks resource.data.caregiverUid (a field), not the path
+      // variable, because the "mis postulaciones" screen reads this via a collectionGroup
+      // query filtered on that same field — Firestore can only prove a collection-group
+      // list query secure when the rule's condition lines up with an actual query filter
+      // on a data field, not a path segment.
+      allow read: if isSignedIn()
+        && (request.auth.uid == resource.data.caregiverUid
+          || request.auth.uid in offer(path[1]).familyUids);
 
-        // The family marks applicants as chosen/rejected; nothing else changes.
-        allow update: if isSignedIn()
-          && request.auth.uid in offer(offerId).familyUids
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+      allow create: if isSignedIn()
+        && request.auth.uid == caregiverUid
+        && request.resource.data.caregiverUid == request.auth.uid
+        && offer(path[1]).status == 'abierta'
+        && request.resource.data.status == 'pendiente';
 
-        // A caregiver can withdraw their own still-pending application.
-        allow delete: if isSignedIn() && request.auth.uid == caregiverUid && resource.data.status == 'pendiente';
-      }
+      // The family marks applicants as chosen/rejected; nothing else changes.
+      allow update: if isSignedIn()
+        && request.auth.uid in offer(path[1]).familyUids
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+
+      // A caregiver can withdraw their own still-pending application.
+      allow delete: if isSignedIn() && request.auth.uid == caregiverUid && resource.data.status == 'pendiente';
     }
 
     match /ratings/{shiftId} {
