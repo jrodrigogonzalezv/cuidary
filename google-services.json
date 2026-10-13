@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "201046732955",
+    "project_id": "cuidary",
+    "storage_bucket": "cuidary.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:201046732955:android:946562a2e394c3582a163e",
+        "android_client_info": {
+          "package_name": "cl.cuidary.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "201046732955-1ol18vai7bi3va5t0t9acu81qe3ad827.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcHSgMGWVV8htrTZpZi3CAMyXYrWTJolU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "201046732955-1ol18vai7bi3va5t0t9acu81qe3ad827.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

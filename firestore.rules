@@ -1,0 +1,151 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function shift(shiftId) {
+      return get(/databases/$(database)/documents/shifts/$(shiftId)).data;
+    }
+
+    function patient(patientId) {
+      return get(/databases/$(database)/documents/patients/$(patientId)).data;
+    }
+
+    function offer(offerId) {
+      return get(/databases/$(database)/documents/shiftOffers/$(offerId)).data;
+    }
+
+    match /users/{uid} {
+      // Any signed-in user can read profiles (needed for the caregiver directory);
+      // the owner can update anything on their own profile, and any signed-in user
+      // (a family member submitting a rating) may update only the rating aggregate fields.
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow update: if isSignedIn()
+        && (
+          request.auth.uid == uid
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratingAvg', 'ratingCount'])
+        );
+    }
+
+    match /patients/{patientId} {
+      // Family always; the assigned caregiver too, once the shift is active, so they can see
+      // the anamnesis and emergency contacts during the shift.
+      allow read: if isSignedIn()
+        && (request.auth.uid in resource.data.familyUids
+          || (resource.data.activeShiftId != null && shift(resource.data.activeShiftId).caregiverUid == request.auth.uid));
+
+      // A family member can register their own patient, starting with no active shift.
+      allow create: if isSignedIn()
+        && request.auth.uid in request.resource.data.familyUids
+        && request.resource.data.activeShiftId == null;
+
+      // A family member can edit their own patient's profile fields (not the shift link).
+      allow update: if isSignedIn()
+        && request.auth.uid in resource.data.familyUids
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'age', 'comuna', 'dependencyLevel', 'photoUrl', 'address', 'anamnesis', 'emergencyContacts']);
+
+      // Only the caregiver of the shift being linked/unlinked may flip activeShiftId,
+      // and only that single field — editing the rest of the patient record happens through ops tooling.
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeShiftId'])
+        && (
+          (request.resource.data.activeShiftId != null
+            && shift(request.resource.data.activeShiftId).caregiverUid == request.auth.uid
+            && shift(request.resource.data.activeShiftId).patientId == patientId)
+          || (request.resource.data.activeShiftId == null
+            && shift(resource.data.activeShiftId).caregiverUid == request.auth.uid)
+        );
+
+      // Prescribed medications: the family manages the list; the assigned caregiver
+      // only needs to read it during the active shift to mark doses as administered.
+      match /medications/{medId} {
+        allow read: if isSignedIn()
+          && (request.auth.uid in patient(patientId).familyUids
+            || (patient(patientId).activeShiftId != null && shift(patient(patientId).activeShiftId).caregiverUid == request.auth.uid));
+
+        allow create, update, delete: if isSignedIn() && request.auth.uid in patient(patientId).familyUids;
+      }
+    }
+
+    match /shifts/{shiftId} {
+      allow read: if isSignedIn()
+        && (resource.data.caregiverUid == request.auth.uid || request.auth.uid in resource.data.familyUids);
+
+      // A family member can book a shift for their own patient, assigning a specific caregiver.
+      // It always starts "programado" — only the assigned caregiver can advance its status (below).
+      allow create: if isSignedIn()
+        && request.resource.data.status == 'programado'
+        && (
+          (request.auth.uid in patient(request.resource.data.patientId).familyUids
+            && request.auth.uid in request.resource.data.familyUids)
+          // A caregiver can also create the shift themselves when accepting a marketplace offer
+          // already assigned to them.
+          || (request.resource.data.caregiverUid == request.auth.uid
+            && request.resource.data.offerId is string
+            && offer(request.resource.data.offerId).assignedCaregiverUid == request.auth.uid
+            && offer(request.resource.data.offerId).patientId == request.resource.data.patientId)
+        );
+
+      // Caregiver can only transition status/endTime of their own shift.
+      allow update: if isSignedIn()
+        && resource.data.caregiverUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'endTime']);
+
+      match /{logCollection}/{entryId} {
+        allow read: if isSignedIn()
+          && (shift(shiftId).caregiverUid == request.auth.uid || request.auth.uid in shift(shiftId).familyUids);
+
+        allow create: if isSignedIn() && shift(shiftId).caregiverUid == request.auth.uid;
+      }
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+    }
+
+    match /shiftOffers/{offerId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.auth.uid in request.resource.data.familyUids
+        && request.auth.uid in patient(request.resource.data.patientId).familyUids
+        && request.resource.data.status == 'abierta';
+
+      // Family can edit or close their own offer while it's still open.
+      allow update: if isSignedIn()
+        && request.auth.uid in resource.data.familyUids
+        && resource.data.status == 'abierta';
+
+      // Any caregiver can accept an open offer, claiming it for themselves.
+      allow update: if isSignedIn()
+        && resource.data.status == 'abierta'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'assignedCaregiverUid', 'assignedCaregiverName'])
+        && request.resource.data.status == 'asignada'
+        && request.resource.data.assignedCaregiverUid == request.auth.uid;
+    }
+
+    match /ratings/{shiftId} {
+      allow read: if isSignedIn();
+
+      // One rating per shift (document id == shiftId, so a second write is an update and falls through denied).
+      // Only a family member on the shift can rate it, once it's completed, and only for its actual caregiver.
+      allow create: if isSignedIn()
+        && request.auth.uid in shift(shiftId).familyUids
+        && shift(shiftId).status == 'completado'
+        && shift(shiftId).caregiverUid == request.resource.data.caregiverUid
+        && request.resource.data.familyUid == request.auth.uid
+        && request.resource.data.stars is int
+        && request.resource.data.stars >= 1
+        && request.resource.data.stars <= 5;
+    }
+  }
+}

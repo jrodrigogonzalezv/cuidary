@@ -1,0 +1,19 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /bitacora/{shiftId}/{fileName} {
+      function shift() {
+        return firestore.get(/databases/(default)/documents/shifts/$(shiftId)).data;
+      }
+
+      allow read: if request.auth != null
+        && (shift().caregiverUid == request.auth.uid || request.auth.uid in shift().familyUids);
+
+      allow write: if request.auth != null
+        && shift().caregiverUid == request.auth.uid
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}
