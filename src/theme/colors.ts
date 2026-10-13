@@ -1,0 +1,30 @@
+export const colors = {
+  primary: '#E8606D',
+  primaryDark: '#C94452',
+  primarySoft: '#FBE3E5',
+  accent: '#6FA8CC',
+  accentSoft: '#E4F0F7',
+  lavender: '#7C5CBF',
+  lavenderSoft: '#EAE2F8',
+  mint: '#0D9488',
+  mintSoft: '#D9F2EC',
+  peach: '#F59E0B',
+  peachSoft: '#FCEAD2',
+  live: '#F59E0B',
+  success: '#059669',
+  successSoft: '#ECFDF5',
+  ink: '#201A2B',
+  muted: '#847F94',
+  border: '#ECE9F6',
+  bgSoft: '#F7F5FC',
+  bg: '#F3F1FA',
+  white: '#FFFFFF',
+};
+
+export const cardPalettes = [
+  { bg: colors.primarySoft, fg: colors.primary },
+  { bg: colors.lavenderSoft, fg: colors.lavender },
+  { bg: colors.mintSoft, fg: colors.mint },
+  { bg: colors.accentSoft, fg: colors.accent },
+  { bg: colors.peachSoft, fg: colors.peach },
+];
