@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
@@ -8,11 +8,12 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from '@react-native-firebase/auth';
-import { doc, onSnapshot, setDoc } from '@react-native-firebase/firestore';
+import { collection, doc, onSnapshot, query, setDoc, where } from '@react-native-firebase/firestore';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { auth, db } from '@/lib/firebase';
 import '@/lib/googleSignIn';
-import type { UserProfile, UserRole } from '@/types/models';
+import type { AppNotification, UserProfile, UserRole } from '@/types/models';
+import { showLocalNotification } from '@/lib/notifications';
 
 interface AuthContextValue {
   user: User | null;
@@ -57,6 +58,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       unsubscribe();
     };
   }, []);
+
+  const knownNotificationIds = useRef<Set<string> | null>(null);
+
+  useEffect(() => {
+    knownNotificationIds.current = null;
+    if (!user) return;
+    const q = query(collection(db, 'notifications'), where('uid', '==', user.uid), where('read', '==', false));
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as AppNotification);
+        if (knownNotificationIds.current) {
+          for (const n of docs) {
+            if (!knownNotificationIds.current.has(n.id)) showLocalNotification(n.title, n.body);
+          }
+        }
+        knownNotificationIds.current = new Set(docs.map((n) => n.id));
+      },
+      () => {
+        knownNotificationIds.current = null;
+      },
+    );
+  }, [user]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

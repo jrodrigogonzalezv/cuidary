@@ -5,6 +5,7 @@ import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, where } fr
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import type { ShiftOffer } from '@/types/models';
+import { reportError } from '@/lib/errors';
 import { colors } from '@/theme/colors';
 
 function todayAt(hhmm: string) {
@@ -73,6 +74,8 @@ export function StableShiftsSection() {
         rateUnit: offer.rateUnit,
       });
       router.push(`/(caregiver)/shift/${ref.id}`);
+    } catch (error) {
+      reportError('No se pudo iniciar el turno de hoy', error);
     } finally {
       setStartingId(null);
     }

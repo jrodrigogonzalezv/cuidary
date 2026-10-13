@@ -96,9 +96,10 @@ Colecciones principales (ver `src/types/models.ts` y `firestore.rules`):
 - Control de signos vitales y fármacos con validación de rangos.
 - **Notas del turno con foto**: el cuidador puede adjuntar una foto a cada nota (botón de cámara junto al campo de texto, usando `src/lib/imagePicker.ts`), y esa foto aparece tanto en las notas del turno como en la bitácora general que ve la familia.
 
-### Marketplace de ofertas y turnos estables/recurrentes
+### Marketplace de ofertas, postulación y turnos estables/recurrentes
 - La familia puede reservar un cuidador directamente (`(family)/book/[patientId].tsx`, sin precio) o publicar una oferta abierta (`(family)/offer/[patientId].tsx`, puntual o recurrente, con monto y unidad de cobro).
-- El cuidador ve las ofertas abiertas filtradas por sus zonas de trabajo (`(caregiver)/offers.tsx`), y al aceptar una oferta recurrente le aparece en **"Turnos estables"** (`StableShiftsSection.tsx`) — cada día que corresponda, presiona "Iniciar turno de hoy" y se crea el turno de esa jornada.
+- **El cuidador se postula, la familia elige** (cambio importante, ver actualización 2026-10-13 abajo): el cuidador ya NO queda asignado de inmediato al aceptar una oferta. Se postula (`(caregiver)/offers.tsx`, pestaña "Disponibles" → botón "Postularme"), y la familia revisa a los postulantes (`(family)/offers.tsx` → `(family)/offer-applicants/[offerId].tsx`) viendo su rating, insignias de reputación y comentarios, y elige quién se queda con el turno.
+- Al elegir, para ofertas recurrentes le aparece al cuidador elegido en **"Turnos estables"** (`StableShiftsSection.tsx`) — cada día que corresponda, presiona "Iniciar turno de hoy" y se crea el turno de esa jornada.
 - **Resumen de ganancias** (`EarningsSummary.tsx`, en el home del cuidador): días trabajados este mes, horas totales, y plata ganada (ya neta de la comisión Cuidary del 12%, ver `src/lib/fees.ts`), calculada a partir de `agreedAmount`/`rateUnit` que ahora se guardan en cada turno al crearlo (antes esa info solo vivía en la oferta y se perdía).
 - Comisión de la plataforma: `CUIDARY_FEE_RATE = 0.12` en `src/lib/fees.ts`.
 
@@ -115,6 +116,50 @@ Colecciones principales (ver `src/types/models.ts` y `firestore.rules`):
 
 ## Pendientes / ideas no implementadas
 
-- Backoffice web para la administración de la empresa (liquidaciones, gestión de cuidadores, disputas).
+- **Backoffice web para la administración de la empresa** — ver sección dedicada abajo con el plan para cuando se quiera construir.
 - Mapa real (si se resuelve el tema de la tarjeta de crédito en GCP).
-- Notificaciones push nativas (hoy las "notificaciones" son documentos de Firestore leídos dentro de la app, no push real vía FCM/APNs).
+- Notificaciones push reales entre dispositivos (hoy son documentos de Firestore + un aviso local en el propio teléfono mientras la app está abierta/en segundo plano — ver actualización 2026-10-13; un push que llegue con la app cerrada requiere FCM + un backend o Cloud Function, lo cual en Firebase requiere plan Blaze/tarjeta de crédito).
+- Botón para que el cuidador retire una postulación pendiente (la regla de Firestore ya lo permite — `allow delete` en `shiftOffers/{id}/applications/{caregiverUid}` — falta solo el botón en la UI).
+
+## Actualización 2026-10-13 (segunda pasada) — postulación con revisión, notificaciones, reputación con insignias
+
+Pedido del usuario: que la familia revise y elija al cuidador en vez de que quede asignado de inmediato al postularse; que existan notificaciones de verdad; captura de errores en toda la app (antes varias operaciones fallaban en silencio); y un sistema de evaluación con etiquetas de comportamiento (amabilidad, puntualidad, etc.) visible cuando un cuidador se postula. El backoffice se deja documentado pero no se construyó (decisión explícita: "podemos desarrollarlo después").
+
+### Postulación con revisión de la familia (el cambio de fondo)
+Antes, `(caregiver)/offers.tsx` ponía `shiftOffers.status = 'asignada'` apenas el cuidador tocaba "Aceptar", y además para turnos puntuales creaba el `shift` en el mismo paso — sin que la familia interviniera. Eso es lo que probablemente generaba el problema que describió el usuario (quedaba "aceptado" pero después la lectura/escritura fallaba en algún punto sin avisar nada, porque no había manejo de errores en ningún lado de ese flujo).
+
+Rediseño:
+- Nueva subcolección `shiftOffers/{offerId}/applications/{caregiverUid}` (tipo `OfferApplication` en `src/types/models.ts`): el cuidador crea su propia postulación (`status: 'pendiente'`), nunca toca el documento de la oferta.
+- `(caregiver)/offers.tsx`: pestañas "Disponibles" (postularme) y "Mis postulaciones" (ver si quedó `pendiente` / `elegido` / `rechazado`).
+- `(family)/offers.tsx` ("Mis ofertas", nuevo tab de familia) lista las ofertas publicadas con el conteo de postulantes en vivo.
+- `(family)/offer-applicants/[offerId].tsx` (nuevo): la familia ve cada postulante con su `CaregiverReputationCard` (estrellas, insignias de reputación más frecuentes, último comentario) y un botón "Elegir a este cuidador". Al elegir: la oferta pasa a `asignada`, se crea el `shift` (si es puntual), y se notifica a todos los postulantes (elegido vs. no elegido).
+- `firestore.rules`: se eliminó la regla que dejaba a cualquier cuidador poner `status: 'asignada'` por su cuenta; se agregaron las reglas de `applications` (crear la propia, leer la familia dueña de la oferta o el propio cuidador, actualizar solo la familia y solo el campo `status`, eliminar solo el propio cuidador mientras esté `pendiente`). No hizo falta tocar las reglas de `shifts` — la familia ya podía crear turnos para su propio paciente.
+- Nuevos índices en `firestore.indexes.json`: `applications` (COLLECTION_GROUP, `caregiverUid`+`appliedAt`, para "Mis postulaciones") y `ratings` (`caregiverUid`+`createdAt`, para la reputación).
+
+### Notificaciones
+- Antes **solo existía la pantalla de notificaciones para el cuidador** — la familia nunca tuvo bell ni pantalla, aunque `notifyFamily()` sí escribía documentos para ellos. Se agregó `(family)/notifications.tsx` + `NotificationBell` en el home de familia (antes faltaba por completo).
+- Se extrajo la lógica común a `src/lib/useNotifications.ts` (hook) + `src/components/NotificationsList.tsx` (presentación), para no duplicar código entre ambos roles.
+- **Avisos locales en el teléfono** (`src/lib/notifications.ts`, paquete `expo-notifications`): cuando llega una notificación nueva sin leer, además de aparecer en la campanita, se muestra como notificación nativa del sistema (banner), igual que cualquier app. Se activa automáticamente desde `AuthContext.tsx` para cualquier usuario autenticado, sin importar en qué pantalla esté.
+  - **Limitación importante y honesta**: esto funciona mientras la app está abierta o en segundo plano (el proceso de JS sigue vivo). No es un push real que llegue con la app completamente cerrada — eso requiere un token FCM + un servidor o Cloud Function que lo dispare, y en Firebase eso exige el plan Blaze (tarjeta de crédito), que es justo la restricción que este proyecto ha evitado desde el principio. Si en algún momento se acepta pagar por Blaze, el siguiente paso sería una Cloud Function `onCreate` sobre `notifications/{id}` que llame a la Admin SDK de FCM.
+
+### Captura de errores
+Antes, casi ninguna escritura a Firestore tenía `catch` — si la regla de seguridad rechazaba la operación (por ejemplo, por datos que cambiaron entre medio), la promesa fallaba sin que nada se mostrara en pantalla. Se agregó `src/lib/errors.ts` (`reportError(title, error)`, con mensajes en español distinguiendo "sin permiso"/"sin conexión"/otro) y se envolvió en `try/catch` todas las acciones que escriben datos: iniciar turno, check-in GPS, signos vitales, administrar medicamento, agregar nota, finalizar turno (`(caregiver)/shift/[id].tsx`), postularse y elegir cuidador (ofertas), reservar turno directo, publicar oferta, enviar evaluación (`RatingPrompt.tsx`), iniciar turno estable del día (`StableShiftsSection.tsx`).
+
+### Reputación con insignias de comportamiento
+- `Rating.tags?: RatingTag[]` (`amabilidad`, `puntualidad`, `limpieza`, `empatia`, `orden`, `buen_trato`, `responsabilidad`, `comunicacion` — ver `src/lib/ratingTags.ts`). La familia los elige como chips al evaluar un turno completado (`RatingPrompt.tsx`), junto con las estrellas y el comentario de siempre (eso ya existía).
+- `CaregiverReputationCard.tsx` (nuevo, reutilizable): dado un `caregiverUid`, muestra las estrellas, las 3 insignias más frecuentes de sus últimas evaluaciones, y el comentario más reciente. Se usa en la pantalla de postulantes de la familia y en el propio perfil del cuidador (`(caregiver)/profile.tsx`).
+- No se tocó `firestore.rules` para esto — la regla de `ratings.create` ya no restringía qué campos adicionales se podían guardar.
+- **Pendiente obvio y fácil**: mostrar esta misma tarjeta en la lista de cuidadores de la reserva directa (`(family)/book/[patientId].tsx`), hoy solo muestra estrellas simples. Se dejó fuera para no multiplicar listeners de Firestore en una lista que puede tener muchos cuidadores — es la misma lógica, solo falta reemplazar el `StarRatingDisplay` por `CaregiverReputationCard` ahí si se quiere.
+
+### Backoffice (plan para más adelante, no construido)
+El usuario pidió "casi un monitoreo en línea": cuántos pacientes, cuántos cuidadores, cómo se comportan, gestionar solicitudes de familias. No se construyó porque es una superficie de app distinta (un panel web, con su propio login de administrador), pero es importante dejar claro que **no requiere plan Blaze ni backend**: se puede hacer como una segunda app (web, React/Vite por ejemplo) que:
+1. Usa el mismo proyecto Firebase (`cuidary`) con el SDK de cliente (igual que esta app).
+2. Agrega un rol `admin` a `users/{uid}.role` (o un custom claim) y una regla nueva en `firestore.rules` que le dé lectura total (`allow read: if isSignedIn() && isAdmin();`) — no hay que tocar nada de lo que ya existe.
+3. Pantallas de solo lectura (o acciones puntuales) sobre las colecciones que ya existen: cuántos `patients`, `users` por rol, `shifts` por estado, `shiftOffers` abiertas/asignadas, `ratings` recientes para detectar cuidadores con mal desempeño.
+4. Todo esto es Firestore puro — nada de Cloud Functions ni servidores, así que sigue siendo gratis en el plan Spark.
+
+Cuando se quiera retomar esto, lo más simple es partir un proyecto Expo/web o Vite nuevo (fuera de este repo de la app móvil) que apunte al mismo `google-services.json`/config de Firebase.
+
+### APK y rama de git
+- Se generó un nuevo APK standalone (perfil `preview`) con todos los cambios de esta pasada — revisar el mensaje de Claude en la conversación para el link de descarga directa (no caduca pronto, y no requiere cuenta de Expo para instalarlo en otro teléfono; solo activar "instalar apps de orígenes desconocidos" en Android).
+- Todo este trabajo se subió a una rama nueva (no a `main`) para poder revisarlo antes de fusionar: `2026-10-13-ofertas-postulacion-notificaciones-reputacion`.

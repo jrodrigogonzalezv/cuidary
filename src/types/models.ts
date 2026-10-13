@@ -129,7 +129,13 @@ export interface BitacoraEntry {
   createdByName: string;
 }
 
-export type NotificationType = 'shift_assigned' | 'shift_started' | 'shift_completed';
+export type NotificationType =
+  | 'shift_assigned'
+  | 'shift_started'
+  | 'shift_completed'
+  | 'offer_applied'
+  | 'offer_chosen'
+  | 'offer_not_chosen';
 
 export interface AppNotification {
   id: string;
@@ -141,6 +147,16 @@ export interface AppNotification {
   type: NotificationType;
 }
 
+export type RatingTag =
+  | 'amabilidad'
+  | 'puntualidad'
+  | 'limpieza'
+  | 'empatia'
+  | 'orden'
+  | 'buen_trato'
+  | 'responsabilidad'
+  | 'comunicacion';
+
 export interface Rating {
   id: string;
   shiftId: string;
@@ -148,6 +164,7 @@ export interface Rating {
   familyUid: string;
   patientName: string;
   stars: number;
+  tags?: RatingTag[];
   comment?: string;
   createdAt: number;
 }
@@ -176,4 +193,19 @@ export interface ShiftOffer {
   assignedCaregiverUid?: string;
   assignedCaregiverName?: string;
   createdAt: number;
+}
+
+export type ApplicationStatus = 'pendiente' | 'elegido' | 'rechazado';
+
+export interface OfferApplication {
+  id: string;
+  caregiverUid: string;
+  caregiverName: string;
+  caregiverPhotoUrl?: string;
+  caregiverTitle?: string;
+  ratingAvg?: number;
+  ratingCount?: number;
+  message?: string;
+  status: ApplicationStatus;
+  appliedAt: number;
 }

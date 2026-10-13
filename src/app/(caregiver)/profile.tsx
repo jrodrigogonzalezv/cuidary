@@ -4,8 +4,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/context/AuthContext';
 import { Avatar } from '@/components/Avatar';
+import { CaregiverReputationCard } from '@/components/CaregiverReputationCard';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { StarRatingDisplay } from '@/components/StarRating';
 import { colors } from '@/theme/colors';
 
 export default function CaregiverProfile() {
@@ -20,7 +20,7 @@ export default function CaregiverProfile() {
           <Avatar name={profile.name} size={76} photoUrl={profile.photoUrl} />
           <Text style={styles.name}>{profile.name}</Text>
           <Text style={styles.jobTitle}>{profile.title || 'Cuidador/a'}</Text>
-          <StarRatingDisplay value={profile.ratingAvg ?? 0} count={profile.ratingCount ?? 0} size={14} />
+          <CaregiverReputationCard caregiverUid={profile.uid} ratingAvg={profile.ratingAvg} ratingCount={profile.ratingCount} />
           <Pressable style={styles.editButton} onPress={() => router.push('/(caregiver)/edit-profile')}>
             <FontAwesome name="pencil" size={12} color={colors.primaryDark} />
             <Text style={styles.editButtonText}>Editar perfil</Text>

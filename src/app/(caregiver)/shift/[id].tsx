@@ -38,6 +38,7 @@ import { Toast, useToastQueue } from '@/components/Toast';
 import { waitForLocationConfirm } from '@/lib/locationConfirmBridge';
 import { pickImage } from '@/lib/imagePicker';
 import { isInRange } from '@/lib/validators';
+import { reportError } from '@/lib/errors';
 import { colors } from '@/theme/colors';
 
 async function notifyFamily(shift: Shift, title: string, body: string, type: NotificationType) {
@@ -156,6 +157,8 @@ export default function ShiftScreen() {
         'shift_started',
       );
       showToast('Turno iniciado y check-in GPS registrado');
+    } catch (error) {
+      reportError('No se pudo iniciar el turno', error);
     } finally {
       setBusy(false);
     }
@@ -175,6 +178,8 @@ export default function ShiftScreen() {
         timestamp: Date.now(),
       });
       showToast('Check-in GPS registrado');
+    } catch (error) {
+      reportError('No se pudo registrar el check-in', error);
     } finally {
       setBusy(false);
     }
@@ -218,6 +223,8 @@ export default function ShiftScreen() {
       setHeartRate('');
       setTemperature('');
       showToast('Signos vitales registrados');
+    } catch (error) {
+      reportError('No se pudieron registrar los signos vitales', error);
     } finally {
       setBusy(false);
     }
@@ -231,12 +238,15 @@ export default function ShiftScreen() {
         name: med.name,
         dose: med.dose,
         observation: observation.trim() || null,
+        // eslint-disable-next-line react-hooks/purity -- Date.now() here runs inside an onPress handler, not during render.
         administeredAt: Date.now(),
         administeredBy: currentUser.uid,
       });
       setAdministeringMedId(null);
       setAdministerNote('');
       showToast(`${med.name} marcado como administrado`);
+    } catch (error) {
+      reportError('No se pudo registrar el medicamento', error);
     } finally {
       setBusy(false);
     }
@@ -267,6 +277,8 @@ export default function ShiftScreen() {
       setNote('');
       setNotePhoto(null);
       showToast('Nota agregada a la bitácora');
+    } catch (error) {
+      reportError('No se pudo agregar la nota', error);
     } finally {
       setBusy(false);
     }
@@ -285,6 +297,8 @@ export default function ShiftScreen() {
         'shift_completed',
       );
       showToast('Turno finalizado');
+    } catch (error) {
+      reportError('No se pudo finalizar el turno', error);
     } finally {
       setBusy(false);
     }
