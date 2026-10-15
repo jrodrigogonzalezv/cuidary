@@ -67,7 +67,7 @@ export default function BookCaregiverScreen() {
     try {
       const start = startOptions[startIndex];
       const startTime = start.offsetMs === null ? nextDayAt9() : Date.now() + start.offsetMs;
-      await addDoc(collection(db, 'shifts'), {
+      const shiftRef = await addDoc(collection(db, 'shifts'), {
         patientId: patient.id,
         patientName: patient.name,
         patientPhotoUrl: patient.photoUrl ?? null,
@@ -86,6 +86,8 @@ export default function BookCaregiverScreen() {
         read: false,
         createdAt: Date.now(),
         type: 'shift_assigned',
+        targetType: 'shift',
+        targetId: shiftRef.id,
       });
       router.replace(`/(family)/patient/${patient.id}`);
     } catch (error) {

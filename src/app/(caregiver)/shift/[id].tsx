@@ -51,6 +51,8 @@ async function notifyFamily(shift: Shift, title: string, body: string, type: Not
         read: false,
         createdAt: Date.now(),
         type,
+        targetType: 'shift',
+        targetId: shift.id,
       }),
     ),
   );

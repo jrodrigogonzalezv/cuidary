@@ -1,10 +1,15 @@
+import { router } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { AppNotification } from '@/types/models';
+import { useAuth } from '@/context/AuthContext';
+import { notificationHref } from '@/lib/notificationNav';
 import { FadeInUp } from '@/components/FadeInUp';
 import { colors } from '@/theme/colors';
 
 export function NotificationsList({ items }: { items: AppNotification[] }) {
+  const { profile } = useAuth();
+
   return (
     <ScrollView contentContainerStyle={styles.content}>
       {items.length === 0 ? (
@@ -15,22 +20,30 @@ export function NotificationsList({ items }: { items: AppNotification[] }) {
           <Text style={styles.empty}>No tienes notificaciones todavía.</Text>
         </View>
       ) : (
-        items.map((item, index) => (
-          <FadeInUp key={item.id} delay={index * 60}>
-            <View style={[styles.card, !item.read && styles.cardUnread]}>
-              <View style={styles.iconWrap}>
-                <FontAwesome name="heart" size={16} color={colors.white} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.cardTitle}>{item.title}</Text>
-                <Text style={styles.cardBody}>{item.body}</Text>
-                <Text style={styles.cardTime}>
-                  {new Date(item.createdAt).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })}
-                </Text>
-              </View>
-            </View>
-          </FadeInUp>
-        ))
+        items.map((item, index) => {
+          const href = notificationHref(item, profile?.role);
+          return (
+            <FadeInUp key={item.id} delay={index * 60}>
+              <Pressable
+                style={[styles.card, !item.read && styles.cardUnread]}
+                onPress={() => href && router.push(href as never)}
+                disabled={!href}
+              >
+                <View style={styles.iconWrap}>
+                  <FontAwesome name="heart" size={16} color={colors.white} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.cardTitle}>{item.title}</Text>
+                  <Text style={styles.cardBody}>{item.body}</Text>
+                  <Text style={styles.cardTime}>
+                    {new Date(item.createdAt).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })}
+                  </Text>
+                </View>
+                {href && <FontAwesome name="chevron-right" size={14} color={colors.muted} />}
+              </Pressable>
+            </FadeInUp>
+          );
+        })
       )}
     </ScrollView>
   );
@@ -50,6 +63,7 @@ const styles = StyleSheet.create({
   empty: { color: colors.muted, textAlign: 'center' },
   card: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
     backgroundColor: colors.white,
     borderRadius: 18,
