@@ -122,6 +122,8 @@ export default function OffersScreen() {
             read: false,
             createdAt: Date.now(),
             type: 'offer_applied',
+            targetType: 'offerApplicants',
+            targetId: offer.id,
           }),
         ),
       );

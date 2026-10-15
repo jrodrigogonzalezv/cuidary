@@ -133,9 +133,12 @@ export type NotificationType =
   | 'shift_assigned'
   | 'shift_started'
   | 'shift_completed'
+  | 'offer_posted'
   | 'offer_applied'
   | 'offer_chosen'
   | 'offer_not_chosen';
+
+export type NotificationTargetType = 'shift' | 'offerApplicants' | 'offers';
 
 export interface AppNotification {
   id: string;
@@ -145,6 +148,8 @@ export interface AppNotification {
   read: boolean;
   createdAt: number;
   type: NotificationType;
+  targetType?: NotificationTargetType;
+  targetId?: string;
 }
 
 export type RatingTag =

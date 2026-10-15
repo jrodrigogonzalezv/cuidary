@@ -77,7 +77,8 @@ export default function PostShiftOfferScreen() {
           body,
           read: false,
           createdAt: Date.now(),
-          type: 'shift_assigned',
+          type: 'offer_posted',
+          targetType: 'offers',
         }),
       ),
     );

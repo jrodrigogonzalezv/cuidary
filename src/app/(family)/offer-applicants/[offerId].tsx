@@ -50,10 +50,11 @@ export default function OfferApplicantsScreen() {
         assignedCaregiverName: application.caregiverName,
       });
 
+      let newShiftId: string | null = null;
       if (offer.scheduleType === 'puntual') {
         const patientSnap = await getDoc(doc(db, 'patients', offer.patientId));
         const patientPhotoUrl = patientSnap.exists() ? (patientSnap.data()?.photoUrl as string | undefined) : undefined;
-        await addDoc(collection(db, 'shifts'), {
+        const shiftRef = await addDoc(collection(db, 'shifts'), {
           patientId: offer.patientId,
           patientName: offer.patientName,
           patientPhotoUrl: patientPhotoUrl ?? null,
@@ -68,6 +69,7 @@ export default function OfferApplicantsScreen() {
           agreedAmount: offer.offeredAmount,
           rateUnit: offer.rateUnit,
         });
+        newShiftId = shiftRef.id;
       }
 
       const applicationsSnap = await getDocs(collection(db, 'shiftOffers', offer.id, 'applications'));
@@ -85,6 +87,9 @@ export default function OfferApplicantsScreen() {
               read: false,
               createdAt: Date.now(),
               type: chosen ? 'offer_chosen' : 'offer_not_chosen',
+              ...(chosen && newShiftId
+                ? { targetType: 'shift', targetId: newShiftId }
+                : { targetType: 'offers' }),
             }),
           ]);
         }),
